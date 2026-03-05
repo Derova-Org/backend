@@ -83,6 +83,11 @@ jobs:
             aws ecr create-repository --repository-name $ECR_REPOSITORY \
               --image-scanning-configuration scanOnPush=true
 
+      - name: Ensure CloudWatch log group exists
+        run: |
+          aws logs create-log-group --log-group-name /ecs/derova-backend 2>/dev/null || echo "Log group already exists"
+          aws logs put-retention-policy --log-group-name /ecs/derova-backend --retention-in-days 30
+
       - name: Pre-flight checks
         run: |
           echo "=== Checking IAM roles ==="

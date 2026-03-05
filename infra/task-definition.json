@@ -50,8 +50,7 @@
         "options": {
           "awslogs-group": "/ecs/derova-backend",
           "awslogs-region": "us-east-1",
-          "awslogs-stream-prefix": "backend",
-          "awslogs-create-group": "true"
+          "awslogs-stream-prefix": "backend"
         }
       },
       "healthCheck": {
