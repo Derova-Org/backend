@@ -1,0 +1,95 @@
+name: Deploy - Backend
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target environment'
+        required: true
+        default: 'production'
+        type: choice
+        options:
+          - staging
+          - production
+
+jobs:
+  deploy:
+    name: Build & Deploy to ECS Fargate
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment }}
+
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ secrets.AWS_REGION || 'us-east-1' }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build, tag, and push Docker image to ECR
+        id: build-image
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          ECR_REPOSITORY: ${{ secrets.ECR_REPOSITORY }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+          echo "image=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" >> $GITHUB_OUTPUT
+
+      - name: Render task definition with new image
+        id: task-def
+        uses: aws-actions/amazon-ecs-render-task-definition@v1
+        with:
+          task-definition: infra/task-definition.json
+          container-name: backend
+          image: ${{ steps.build-image.outputs.image }}
+
+      - name: Register task definition and deploy ECS service
+        env:
+          AWS_REGION: ${{ secrets.AWS_REGION || 'us-east-1' }}
+          RENDERED_TASK_DEF: ${{ steps.task-def.outputs.task-definition }}
+        run: |
+          TASK_DEF_ARN=$(aws ecs register-task-definition             --cli-input-json file://$RENDERED_TASK_DEF             --query 'taskDefinition.taskDefinitionArn'             --output text)
+          echo "Registered: $TASK_DEF_ARN"
+
+          SERVICE_STATUS=$(aws ecs describe-services             --cluster derova --services derova-backend             --region $AWS_REGION             --query 'services[?status!=`INACTIVE`].status'             --output text 2>/dev/null || echo "")
+
+          if [ -z "$SERVICE_STATUS" ]; then
+            echo "Creating ECS service (first deployment)..."
+            aws ecs create-service               --cluster derova               --service-name derova-backend               --task-definition "$TASK_DEF_ARN"               --desired-count 2               --launch-type FARGATE               --network-configuration "awsvpcConfiguration={subnets=[subnet-0b96ac6e2a27ad803,subnet-046e3bff40428650a],securityGroups=[sg-096e44580f804bb90],assignPublicIp=DISABLED}"               --load-balancers "targetGroupArn=arn:aws:elasticloadbalancing:us-east-1:273369152732:targetgroup/derova-backend/ff32c59141d8b118,containerName=backend,containerPort=3000"               --health-check-grace-period-seconds 60               --deployment-configuration "deploymentCircuitBreaker={enable=true,rollback=true},minimumHealthyPercent=50,maximumPercent=200"               --region $AWS_REGION
+          else
+            echo "Updating service ($SERVICE_STATUS)..."
+            aws ecs update-service               --cluster derova               --service derova-backend               --task-definition "$TASK_DEF_ARN"               --force-new-deployment               --region $AWS_REGION
+          fi
+
+          echo "Waiting for service to stabilize..."
+          aws ecs wait services-stable             --cluster derova --services derova-backend             --region $AWS_REGION
+          echo "Service stable."
+
+      - name: Verify health endpoint
+        run: |
+          ALB_DNS=$(aws elbv2 describe-load-balancers             --query 'LoadBalancers[?contains(LoadBalancerName,`derova`)].DNSName'             --output text 2>/dev/null || echo "")
+          if [ -n "$ALB_DNS" ]; then
+            echo "ALB DNS: $ALB_DNS"
+            curl -sf "http://$ALB_DNS/health" && echo "/health OK" || echo "/health not yet reachable"
+          fi
+
+      - name: Summary
+        env:
+          IMAGE: ${{ steps.build-image.outputs.image }}
+        run: |
+          echo "### Backend deployment complete" >> $GITHUB_STEP_SUMMARY
+          echo "- Environment: ${{ github.event.inputs.environment }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Image: $IMAGE" >> $GITHUB_STEP_SUMMARY
+          echo "- Cluster: derova / Service: derova-backend" >> $GITHUB_STEP_SUMMARY
