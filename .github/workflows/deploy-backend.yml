@@ -39,15 +39,21 @@ jobs:
           token: ${{ secrets.GH_READ_SDK_TOKEN }}
           path: sdk
 
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Build SDK
+        working-directory: sdk
+        run: npm ci && npm run build
+
       - name: Patch package.json and Dockerfile for local SDK path
         run: |
-          # Repoint file:../sdk -> file:./sdk so Docker build context works
           sed -i 's|"@derova/sdk": "file:../sdk"|"@derova/sdk": "file:./sdk"|g' package.json
-          # Regenerate lock file for the new path (no install, just lock update)
-          npm install --package-lock-only --ignore-scripts --prefer-offline 2>/dev/null || true
-          # Patch Dockerfile to COPY sdk/ before npm ci
+          npm install --package-lock-only --ignore-scripts 2>/dev/null || true
           sed -i 's|COPY package.json package-lock.json\* \./|COPY sdk ./sdk\nCOPY package.json package-lock.json* ./|' Dockerfile
-          echo "--- patched Dockerfile build stage ---"
+          echo "Dockerfile first 10 lines:"
           head -10 Dockerfile
 
       - name: Configure AWS credentials
