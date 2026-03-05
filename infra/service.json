@@ -1,0 +1,55 @@
+{
+  "cluster": "derova",
+  "serviceName": "derova-backend",
+  "taskDefinition": "derova-backend",
+  "desiredCount": 2,
+  "launchType": "FARGATE",
+  "platformVersion": "LATEST",
+  "networkConfiguration": {
+    "awsvpcConfiguration": {
+      "subnets": [
+        "subnet-0b96ac6e2a27ad803",
+        "subnet-046e3bff40428650a"
+      ],
+      "securityGroups": [
+        "sg-096e44580f804bb90"
+      ],
+      "assignPublicIp": "DISABLED"
+    }
+  },
+  "loadBalancers": [
+    {
+      "targetGroupArn": "arn:aws:elasticloadbalancing:us-east-1:273369152732:targetgroup/derova-backend/ff32c59141d8b118",
+      "containerName": "backend",
+      "containerPort": 3000
+    }
+  ],
+  "deploymentConfiguration": {
+    "minimumHealthyPercent": 50,
+    "maximumPercent": 200,
+    "deploymentCircuitBreaker": {
+      "enable": true,
+      "rollback": true
+    }
+  },
+  "deploymentController": {
+    "type": "ECS"
+  },
+  "healthCheckGracePeriodSeconds": 60,
+  "enableECSManagedTags": true,
+  "propagateTags": "SERVICE",
+  "tags": [
+    {
+      "key": "project",
+      "value": "derova"
+    },
+    {
+      "key": "component",
+      "value": "backend"
+    },
+    {
+      "key": "env",
+      "value": "production"
+    }
+  ]
+}
