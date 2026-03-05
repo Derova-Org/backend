@@ -53,8 +53,6 @@ jobs:
           sed -i 's|"@derova/sdk": "file:../sdk"|"@derova/sdk": "file:./sdk"|g' package.json
           npm install --package-lock-only --ignore-scripts 2>/dev/null || true
           sed -i 's|COPY package.json package-lock.json\* \./|COPY sdk ./sdk\nCOPY package.json package-lock.json* ./|' Dockerfile
-          echo "Dockerfile first 10 lines:"
-          head -10 Dockerfile
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -62,9 +60,34 @@ jobs:
           role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
           aws-region: us-east-1
 
+      - name: Ensure ECS cluster exists
+        run: |
+          CLUSTER_STATUS=$(aws ecs describe-clusters \
+            --clusters $ECS_CLUSTER \
+            --query 'clusters[?status==`ACTIVE`].status' \
+            --output text 2>/dev/null || echo "")
+          if [ -z "$CLUSTER_STATUS" ]; then
+            echo "Creating ECS cluster '$ECS_CLUSTER'..."
+            aws ecs create-cluster \
+              --cluster-name $ECS_CLUSTER \
+              --capacity-providers FARGATE FARGATE_SPOT \
+              --tags key=project,value=derova
+            echo "Cluster created."
+          else
+            echo "Cluster '$ECS_CLUSTER' exists (status: $CLUSTER_STATUS)"
+          fi
+
       - name: Login to Amazon ECR
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Ensure ECR repository exists
+        run: |
+          aws ecr describe-repositories --repository-names $ECR_REPOSITORY 2>/dev/null || \
+            aws ecr create-repository \
+              --repository-name $ECR_REPOSITORY \
+              --image-scanning-configuration scanOnPush=true \
+              --tags Key=project,Value=derova
 
       - name: Build, tag, and push Docker image to ECR
         id: build-image
@@ -120,7 +143,7 @@ jobs:
               --force-new-deployment
           fi
 
-          echo "Waiting for service to stabilize..."
+          echo "Waiting for service to stabilize (up to 10 min)..."
           aws ecs wait services-stable \
             --cluster $ECS_CLUSTER --services $ECS_SERVICE
           echo "Service stable."
@@ -132,7 +155,9 @@ jobs:
             --output text 2>/dev/null || echo "")
           if [ -n "$ALB_DNS" ]; then
             echo "ALB DNS: $ALB_DNS"
-            curl -sf "http://$ALB_DNS/health" && echo " => /health OK" || echo " => /health not reachable yet"
+            curl -sf "http://$ALB_DNS/health" && echo " => /health OK" || echo " => /health not yet reachable"
+          else
+            echo "No ALB found matching 'derova' — skipping health check"
           fi
 
       - name: Summary
