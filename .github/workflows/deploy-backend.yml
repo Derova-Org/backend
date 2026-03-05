@@ -29,8 +29,26 @@ jobs:
       ECS_SERVICE: derova-backend
 
     steps:
-      - name: Checkout
+      - name: Checkout backend
         uses: actions/checkout@v4
+
+      - name: Checkout SDK (file:../sdk dependency)
+        uses: actions/checkout@v4
+        with:
+          repository: Derova-Org/sdk
+          token: ${{ secrets.GH_READ_SDK_TOKEN }}
+          path: sdk
+
+      - name: Patch package.json and Dockerfile for local SDK path
+        run: |
+          # Repoint file:../sdk -> file:./sdk so Docker build context works
+          sed -i 's|"@derova/sdk": "file:../sdk"|"@derova/sdk": "file:./sdk"|g' package.json
+          # Regenerate lock file for the new path (no install, just lock update)
+          npm install --package-lock-only --ignore-scripts --prefer-offline 2>/dev/null || true
+          # Patch Dockerfile to COPY sdk/ before npm ci
+          sed -i 's|COPY package.json package-lock.json\* \./|COPY sdk ./sdk\nCOPY package.json package-lock.json* ./|' Dockerfile
+          echo "--- patched Dockerfile build stage ---"
+          head -10 Dockerfile
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -109,8 +127,6 @@ jobs:
           if [ -n "$ALB_DNS" ]; then
             echo "ALB DNS: $ALB_DNS"
             curl -sf "http://$ALB_DNS/health" && echo " => /health OK" || echo " => /health not reachable yet"
-          else
-            echo "ALB not found via name filter — skipping health check"
           fi
 
       - name: Summary
