@@ -86,7 +86,7 @@ jobs:
       - name: Ensure CloudWatch log group exists
         run: |
           aws logs create-log-group --log-group-name /ecs/derova-backend 2>/dev/null || echo "Log group already exists"
-          aws logs put-retention-policy --log-group-name /ecs/derova-backend --retention-in-days 30
+          aws logs put-retention-policy --log-group-name /ecs/derova-backend --retention-in-days 30 2>/dev/null || echo "Could not set retention (optional)"
 
       - name: Pre-flight checks
         run: |
