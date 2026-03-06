@@ -6,9 +6,9 @@
  */
 
 import jwt from 'jsonwebtoken';
-import { getSecrets, deriveOprfKey, oprfEvaluate } from '../crypto';
+import { getSecrets, deriveOprfKey, oprfEvaluate } from '../crypto/index.js';
 import { verifySignature, hashUsername as sdkHashUsername, randomBytes, bytesToHex, hexToBytes } from '@derova/sdk';
-import { accountExists, createAccountRecord, getAccountRecord, type AccountRecord } from '../storage';
+import { accountExists, createAccountRecord, getAccountRecord, type AccountRecord } from '../storage/index.js';
 import logger from '../logger.js';
 
 // ---------------------------------------------------------------------------

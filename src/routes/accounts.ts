@@ -19,9 +19,9 @@ import {
   verifyRegistration,
   loginOprf,
   verifyLogin,
-} from '../services';
-import { createAccount, getClient } from '../ledger';
-import {sessionLogout} from "../services/account";
+} from '../services/index.js';
+import { createAccount, getClient } from '../ledger/index.js';
+import {sessionLogout} from "../services/account.js";
 import { registerLimiter, loginLimiter, logoutLimiter } from '../middleware/rate-limit.js';
 
 export const accountsRouter = Router();

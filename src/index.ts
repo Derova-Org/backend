@@ -3,7 +3,7 @@ import express, { type Request, type Response, type NextFunction } from 'express
 import cors from 'cors';
 import helmet from 'helmet';
 import { randomUUID } from 'node:crypto';
-import { healthRouter, accountsRouter, balancesRouter } from './routes';
+import { healthRouter, accountsRouter, balancesRouter } from './routes/index.js';
 import { closePool } from './storage/db.js';
 import { runMigrations } from './storage/migrate.js';
 import logger from './logger.js';
