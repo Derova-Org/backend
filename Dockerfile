@@ -4,7 +4,7 @@ WORKDIR /app
 # Build SDK first (backend depends on @derova/sdk via file:../sdk)
 COPY sdk/package.json sdk/package-lock.json* sdk/
 RUN cd sdk && npm ci
-COPY sdk/tsconfig.json sdk/tsconfig.build.json* sdk/
+COPY sdk/tsconfig.json sdk/tsconfig.build.json* sdk/tsup.config.ts* sdk/
 COPY sdk/src sdk/src
 RUN cd sdk && npm run build
 
