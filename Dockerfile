@@ -16,6 +16,7 @@ COPY backend/src backend/src
 RUN cd backend && npm run build
 
 FROM node:22-slim
+RUN apt-get update && apt-get install -y --no-install-recommends curl && rm -rf /var/lib/apt/lists/*
 WORKDIR /repo/backend
 COPY --from=build /repo/sdk /repo/sdk
 COPY --from=build /repo/backend/package.json /repo/backend/package-lock.json* ./

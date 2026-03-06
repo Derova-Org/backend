@@ -1,0 +1,69 @@
+{
+  "family": "derova-backend",
+  "taskRoleArn": "arn:aws:iam::273369152732:role/derova-backend-task-role",
+  "executionRoleArn": "arn:aws:iam::273369152732:role/derova-backend-execution-role",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": ["FARGATE"],
+  "cpu": "256",
+  "memory": "512",
+  "containerDefinitions": [
+    {
+      "name": "backend",
+      "image": "273369152732.dkr.ecr.us-east-1.amazonaws.com/derova-backend:latest",
+      "essential": true,
+      "portMappings": [
+        {
+          "containerPort": 3000,
+          "protocol": "tcp"
+        }
+      ],
+      "secrets": [
+        {
+          "name": "DATABASE_URL",
+          "valueFrom": "arn:aws:secretsmanager:us-east-1:273369152732:secret:derova/backend/DATABASE_URL"
+        },
+        {
+          "name": "JWT_SECRET",
+          "valueFrom": "arn:aws:secretsmanager:us-east-1:273369152732:secret:derova/backend/JWT_SECRET"
+        },
+        {
+          "name": "HMAC_KEY",
+          "valueFrom": "arn:aws:secretsmanager:us-east-1:273369152732:secret:derova/backend/HMAC_KEY"
+        }
+      ],
+      "environment": [
+        {
+          "name": "NODE_ENV",
+          "value": "production"
+        },
+        {
+          "name": "PORT",
+          "value": "3000"
+        },
+        {
+          "name": "CORS_ORIGINS",
+          "value": "https://d54l41zldgkpo.cloudfront.net"
+        }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/derova-backend",
+          "awslogs-region": "us-east-1",
+          "awslogs-stream-prefix": "backend"
+        }
+      },
+      "healthCheck": {
+        "command": [
+          "CMD-SHELL",
+          "curl -sf http://localhost:3000/health || exit 1"
+        ],
+        "interval": 30,
+        "timeout": 5,
+        "retries": 3,
+        "startPeriod": 60
+      },
+      "stopTimeout": 30
+    }
+  ]
+}
