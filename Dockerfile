@@ -22,5 +22,6 @@ COPY --from=build /app/sdk ./sdk
 COPY --from=build /app/package.json /app/package-lock.json* ./
 RUN npm ci --omit=dev
 COPY --from=build /app/dist ./dist
+COPY migrations ./migrations
 EXPOSE 3000
 CMD ["node", "dist/index.js"]
